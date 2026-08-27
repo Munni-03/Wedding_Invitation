@@ -8,7 +8,7 @@ export default function MusicPlayer() {
 
   useEffect(() => {
     // 🎵 1. Reliable & Royalty-Free Ambient Wedding Audio Stream URL
-    const audio = new Audio('https://stream.zeno.fm/f3wvbbqmdg8uv');
+    const audio = new Audio('/song.mp3');
     audio.loop = true;
     audio.preload = 'auto';
     audioRef.current = audio;
