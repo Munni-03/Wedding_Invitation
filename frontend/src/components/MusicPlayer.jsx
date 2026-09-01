@@ -99,7 +99,7 @@ export default function MusicPlayer() {
               className="font-serif"
               style={{ fontSize: '32px', color: '#6b2d39', margin: '0 0 12px 0', fontWeight: '400' }}
             >
-              Munni & Jungkook
+              Sarah & Kabir
             </h2>
             <p style={{ fontSize: '13px', color: '#8c7a6b', marginBottom: '28px' }}>
               🎵 Turn on sound for the best experience

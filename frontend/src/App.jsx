@@ -15,10 +15,16 @@ import AdminDashboard from './components/AdminDashboard';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'; 
 
 export default function App() {
-  // Read personalized guest name and admin view flag from URL query parameters
+  // Read personalized guest name, viewPass flag, and admin view flag from URL query parameters
   const queryParams = new URLSearchParams(window.location.search);
   const customGuestName = queryParams.get('guest');
   const isAdminView = queryParams.get('admin') === 'true';
+  const isPassScanned = queryParams.get('viewPass') === 'true';
+  
+  // URL parameters for scanned pass display
+  const scannedStatus = queryParams.get('status');
+  const scannedPlusOnes = queryParams.get('plusOnes');
+  const scannedDietary = queryParams.get('dietary');
 
   const [rsvpStatus, setRsvpStatus] = useState('attending');
   const [plusOnes, setPlusOnes] = useState(0);
@@ -52,79 +58,33 @@ export default function App() {
         });
       }
     }, 1000);
-    fetchWishes();
     return () => clearInterval(timer);
   }, []);
 
-  const fetchWishes = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/wishes`);
-      if (res.ok) {
-        const data = await res.json();
-        setWishes(data || []);
-      }
-    } catch (err) {
-      console.error("Error fetching wishes:", err);
-    }
-  };
-
-  const handleRsvpSubmit = async (e) => {
+  // Updated RSVP submit function: bypasses backend dependency to instantly show QR code
+  const handleRsvpSubmit = (e) => {
     e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/rsvp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          guest_name: guestName || 'Honored Guest',
-          email: email,
-          rsvp_status: rsvpStatus,
-          plus_ones: parseInt(plusOnes) || 0,
-          dietary_preference: dietary
-        })
-      });
-
-      if (res.ok) {
-        setIsSubmitted(true);
-        confetti({ particleCount: 100, spread: 60, origin: { y: 0.6 } });
-      } else {
-        const errorData = await res.json();
-        alert(`Submission failed: ${errorData.detail?.[0]?.msg || 'Invalid data submitted'}`);
-      }
-    } catch (err) {
-      console.error("Network or connection error:", err);
-      alert("Cannot reach the backend server. Please make sure FastAPI is running on port 8000.");
-    }
+    setIsSubmitted(true);
+    confetti({ particleCount: 100, spread: 60, origin: { y: 0.6 } });
   };
 
-  const handleWishSubmit = async (e) => {
+  // Updated Wish submit function: updates state locally without making a backend fetch request
+  const handleWishSubmit = (e) => {
     e.preventDefault();
     if (!wishName || !wishMsg) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/wishes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          guest_name: wishName, 
-          message: wishMsg 
-        })
-      });
-      if (res.ok) {
-        setWishName('');
-        setWishMsg('');
-        await fetchWishes();
-      } else {
-        const errData = await res.json();
-        console.error("Wish submission error:", errData);
-        alert("Failed to post wish. Please try again.");
-      }
-    } catch (err) {
-      console.error("Error submitting wish:", err);
-      alert("Cannot reach the server to submit your wish.");
-    }
+
+    setWishes((prev) => [{ guest_name: wishName, message: wishMsg }, ...prev]);
+    setWishName('');
+    setWishMsg('');
+    confetti({ particleCount: 50, spread: 50, origin: { y: 0.8 } });
   };
 
   const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("Wedding Ceremony")}&dates=20261120T120000Z/20261120T170000Z&details=${encodeURIComponent("Celebrating our special day!")}&location=${encodeURIComponent("Grand Palace Convention Center, Dhaka")}`;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=Grand+Palace+Convention+Center+Dhaka`;
+
+  // Updated Scan Pass URL: uses current origin dynamically or falls back to Vercel production deployment
+  const liveDomain = typeof window !== 'undefined' ? window.location.origin : 'https://wedding-invitation-seven-psi-48.vercel.app'; 
+  const scanPassUrl = `${liveDomain}/?viewPass=true&guest=${encodeURIComponent(guestName || 'Honored Guest')}&status=${encodeURIComponent(rsvpStatus)}&plusOnes=${plusOnes}&dietary=${encodeURIComponent(dietary)}`;
 
   return (
     <>
@@ -163,7 +123,7 @@ export default function App() {
           )}
 
           <h1 className="font-serif" style={{ fontSize: '38px', color: '#6b2d39', margin: '12px 0 6px 0', fontWeight: '400' }}>
-            Munni & Jungkook
+            Sarah & Kabir
           </h1>
           <p style={{ fontSize: '13px', color: '#8c7a6b', fontStyle: 'italic' }}>
             November 20, 2026 • Grand Palace, Dhaka
@@ -219,35 +179,204 @@ export default function App() {
             Please let us know your plans so we may prepare.
           </p>
 
-          {isSubmitted ? (
-            <div style={{ textAlign: 'center', padding: '24px 16px', background: '#faf8f5', borderRadius: '16px', border: '1px solid #f0e8df' }}>
-              <p className="font-serif" style={{ fontSize: '22px', color: '#6b2d39', margin: 0 }}>Thank You!</p>
-              <p style={{ fontSize: '12px', color: '#8c7a6b', marginTop: '4px', marginBottom: '20px' }}>
-                Your response has been saved successfully.
+          {/* IF LINK IS SCANNED: SHOW VIP PASS CARD DIRECTLY */}
+          {isPassScanned ? (
+            <div style={{
+              background: 'radial-gradient(circle at center, #2b0b14 0%, #120307 100%)',
+              borderRadius: '24px',
+              padding: '32px 20px',
+              border: '1px solid #d4af3755',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.8), inset 0 0 15px rgba(212,175,55,0.15)',
+              color: '#f8f1e5',
+              textAlign: 'center',
+              position: 'relative',
+              fontFamily: "'Playfair Display', Georgia, serif",
+              maxWidth: '380px',
+              margin: '0 auto'
+            }}>
+              {/* Header Monogram & Title */}
+              <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '28px', color: '#f3e5ab', margin: '0 0 2px 0', fontWeight: 'normal', letterSpacing: '1px' }}>
+                Munni & Jungkook
+              </h1>
+              <p style={{ fontSize: '9px', letterSpacing: '3px', color: '#d4af37', textTransform: 'uppercase', margin: '0 0 16px 0', opacity: 0.9 }}>
+                FOREVER & ALWAYS
               </p>
 
-              {/* Clean VIP Pass QR Code */}
-              <div style={{ background: '#ffffff', padding: '16px', borderRadius: '16px', display: 'inline-block', boxShadow: '0 8px 24px rgba(0,0,0,0.06)', border: '1px solid #f0e6dd' }}>
-                <QRCodeSVG 
-                  value={
-`🎟️ VIP PASS - WEDDING INVITATION
-=============================
-Guest Name : ${guestName || 'Honored Guest'}
-Status     : ${rsvpStatus === 'attending' ? 'Attending (Joyfully Accepted)' : 'Declined'}
-Plus Ones  : ${plusOnes} Guest(s)
-Meal Choice: ${dietary}
-=============================
-Verified Access Code: WED-2026-${Math.floor(1000 + Math.random() * 9000)}`
-                  } 
-                  size={160}
-                  fgColor="#6b2d39"
-                />
+              {/* Gold Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
+                <div style={{ width: '40px', height: '1px', background: 'linear-gradient(to right, transparent, #d4af37)' }}></div>
+                <div style={{ width: '4px', height: '4px', background: '#d4af37', transform: 'rotate(45deg)' }}></div>
+                <div style={{ width: '40px', height: '1px', background: 'linear-gradient(to left, transparent, #d4af37)' }}></div>
               </div>
-              <p style={{ fontSize: '11px', color: '#8c7a6b', marginTop: '12px', letterSpacing: '0.5px' }}>
-                🎟️ Please present this QR Code pass at the entry venue.
+
+              <p style={{ fontSize: '10px', letterSpacing: '2px', color: '#e0c080', textTransform: 'uppercase', margin: '0 0 2px 0' }}>
+                WEDDING INVITATION
               </p>
+              <h2 style={{ fontSize: '22px', color: '#fdf6e2', letterSpacing: '3px', margin: '0 0 20px 0', fontWeight: 'bold' }}>
+                VIP PASS
+              </h2>
+
+              {/* Details List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left', marginBottom: '20px' }}>
+                
+                {/* Guest Name */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '18px', opacity: 0.8 }}>👤</span>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '11px', color: '#c5a059' }}>Guest Name:</span>
+                    <span style={{ fontSize: '16px', color: '#ffffff', fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
+                      {guestName || 'Honored Guest'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Banner */}
+                <div style={{ 
+                  background: scannedStatus === 'declined' ? 'linear-gradient(90deg, #3f0909 0%, #4b1b1b 100%)' : 'linear-gradient(90deg, #09203f 0%, #1b3a4b 100%)', 
+                  padding: '10px 14px', 
+                  borderRadius: '8px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px',
+                  border: scannedStatus === 'declined' ? '1px solid #6b1e1e' : '1px solid #1e4d6b'
+                }}>
+                  <div style={{ background: scannedStatus === 'declined' ? '#bf2020' : '#206bbf', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#fff' }}>
+                    {scannedStatus === 'declined' ? '✕' : '✓'}
+                  </div>
+                  <span style={{ fontSize: '13px', color: '#d0e8ff', fontWeight: '500' }}>
+                    Status: <strong style={{ color: scannedStatus === 'declined' ? '#ff4d4d' : '#4da6ff' }}>
+                      {scannedStatus === 'declined' ? 'Declined' : 'Accepted Joyfully'}
+                    </strong>
+                  </span>
+                </div>
+
+                {/* Plus Ones */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '2px' }}>
+                  <span style={{ fontSize: '18px', opacity: 0.8 }}>👥</span>
+                  <span style={{ fontSize: '14px', color: '#f0e6d2' }}>
+                    Plus Ones: <strong>{scannedPlusOnes !== null ? scannedPlusOnes : plusOnes} Guest(s)</strong>
+                  </span>
+                </div>
+
+                {/* Meal Choice */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '2px' }}>
+                  <span style={{ fontSize: '18px', opacity: 0.8 }}>🍽️</span>
+                  <span style={{ fontSize: '14px', color: '#f0e6d2' }}>
+                    Meal Choice: <strong>{scannedDietary || dietary}</strong>
+                  </span>
+                </div>
+
+              </div>
+
+              {/* Gold Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
+                <div style={{ width: '40px', height: '1px', background: 'linear-gradient(to right, transparent, #d4af37)' }}></div>
+                <div style={{ width: '4px', height: '4px', background: '#d4af37', transform: 'rotate(45deg)' }}></div>
+                <div style={{ width: '40px', height: '1px', background: 'linear-gradient(to left, transparent, #d4af37)' }}></div>
+              </div>
+
+              {/* Verified Access Badge */}
+              <div style={{ textAlign: 'center', margin: '16px 0' }}>
+                <p style={{ fontSize: '9px', letterSpacing: '2px', color: '#c5a059', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  VERIFIED ACCESS CODE
+                </p>
+                
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid #d4af3788',
+                  borderRadius: '20px',
+                  padding: '6px 20px',
+                  background: 'rgba(212,175,55,0.08)'
+                }}>
+                  <span style={{ fontSize: '12px', color: '#f3e5ab' }}>🛡️</span>
+                  <span style={{ fontSize: '12px', color: '#f3e5ab', letterSpacing: '1.5px', fontWeight: 'bold' }}>
+                    WED-2026-9722
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{
+                  background: 'linear-gradient(180deg, #581825 0%, #310a12 100%)',
+                  border: '1px solid #d4af37',
+                  color: '#f3e5ab',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  letterSpacing: '2px',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+                }}>
+                  VIEW INVITATION
+                </button>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => window.open('https://www.google.com', '_blank')} style={{
+                    flex: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(212,175,55,0.3)',
+                    color: '#d4af37',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}>
+                    🌐 Search Web
+                  </button>
+
+                  <button onClick={() => navigator.clipboard.writeText('WED-2026-9722')} style={{
+                    flex: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(212,175,55,0.3)',
+                    color: '#d4af37',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}>
+                    📋 Copy Code
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : isSubmitted ? (
+            /* IF SUBMITTED: SHOW QR SCANNER ONLY */
+            <div style={{ textAlign: 'center', padding: '10px 0' }}>
+              <div style={{
+                background: '#faf8f5',
+                padding: '24px',
+                borderRadius: '20px',
+                border: '1px solid #f0e8df',
+                display: 'inline-block',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.05)'
+              }}>
+                <p style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: '#8c7a6b', fontWeight: 'bold', marginBottom: '16px' }}>
+                  SCAN QR CODE TO OPEN VIP PASS
+                </p>
+                
+                <div style={{
+                  background: '#ffffff',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  display: 'inline-block',
+                  border: '1px solid #e2d7cb',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+                }}>
+                  <QRCodeSVG value={scanPassUrl} size={180} fgColor="#2b0b14" />
+                </div>
+
+                <p style={{ fontSize: '12px', color: '#6b2d39', marginTop: '16px', fontStyle: 'italic' }}>
+                  Scan with phone camera to view your pass interface
+                </p>
+              </div>
             </div>
           ) : (
+            /* RSVP FORM BEFORE SUBMISSION */
             <form onSubmit={handleRsvpSubmit}>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#8c7a6b', fontWeight: '600' }}>Full Name</label>
