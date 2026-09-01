@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { QRCodeSVG } from 'qrcode.react';
 
+// Import Supabase Client
+import { supabase } from './supabaseClient';
+
 // ⚠️ CSS Import to apply floating animations and layout fixes
 import './App.css';
 
@@ -11,17 +14,12 @@ import VenueGuide from './components/VenueGuide';
 import PhotoGallery from './components/PhotoGallery';
 import AdminDashboard from './components/AdminDashboard';
 
-// Dynamic API Base URL fallback configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'; 
-
 export default function App() {
-  // Read personalized guest name, viewPass flag, and admin view flag from URL query parameters
   const queryParams = new URLSearchParams(window.location.search);
   const customGuestName = queryParams.get('guest');
   const isAdminView = queryParams.get('admin') === 'true';
   const isPassScanned = queryParams.get('viewPass') === 'true';
   
-  // URL parameters for scanned pass display
   const scannedStatus = queryParams.get('status');
   const scannedPlusOnes = queryParams.get('plusOnes');
   const scannedDietary = queryParams.get('dietary');
@@ -45,6 +43,24 @@ export default function App() {
     }
   }, [customGuestName]);
 
+  // Fetch all wishes from Supabase on initial component mount
+  useEffect(() => {
+    fetchWishes();
+  }, []);
+
+  const fetchWishes = async () => {
+    const { data, error } = await supabase
+      .from('wishes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching wishes:', error);
+    } else if (data) {
+      setWishes(data);
+    }
+  };
+
   useEffect(() => {
     const eventDate = new Date("2026-11-20T18:00:00");
     const timer = setInterval(() => {
@@ -61,29 +77,39 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Updated RSVP submit function: bypasses backend dependency to instantly show QR code
   const handleRsvpSubmit = (e) => {
     e.preventDefault();
     setIsSubmitted(true);
     confetti({ particleCount: 100, spread: 60, origin: { y: 0.6 } });
   };
 
-  // Updated Wish submit function: updates state locally without making a backend fetch request
-  const handleWishSubmit = (e) => {
+  // Insert wish directly into Supabase database
+  const handleWishSubmit = async (e) => {
     e.preventDefault();
     if (!wishName || !wishMsg) return;
 
-    setWishes((prev) => [{ guest_name: wishName, message: wishMsg }, ...prev]);
-    setWishName('');
-    setWishMsg('');
-    confetti({ particleCount: 50, spread: 50, origin: { y: 0.8 } });
+    const newWish = { guest_name: wishName, message: wishMsg };
+
+    const { data, error } = await supabase
+      .from('wishes')
+      .insert([newWish])
+      .select();
+
+    if (error) {
+      console.error('Error submitting wish:', error);
+      alert('Could not send wish. Please try again!');
+    } else {
+      setWishes((prev) => [data[0], ...prev]);
+      setWishName('');
+      setWishMsg('');
+      confetti({ particleCount: 50, spread: 50, origin: { y: 0.8 } });
+    }
   };
 
   const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("Wedding Ceremony")}&dates=20261120T120000Z/20261120T170000Z&details=${encodeURIComponent("Celebrating our special day!")}&location=${encodeURIComponent("Grand Palace Convention Center, Dhaka")}`;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=Grand+Palace+Convention+Center+Dhaka`;
 
-  // Updated Scan Pass URL: uses current origin dynamically or falls back to Vercel production deployment
-  const liveDomain = typeof window !== 'undefined' ? window.location.origin : 'https://wedding-invitation-seven-psi-48.vercel.app'; 
+  const liveDomain = 'https://wedding-invitation-seven-psi-48.vercel.app'; 
   const scanPassUrl = `${liveDomain}/?viewPass=true&guest=${encodeURIComponent(guestName || 'Honored Guest')}&status=${encodeURIComponent(rsvpStatus)}&plusOnes=${plusOnes}&dietary=${encodeURIComponent(dietary)}`;
 
   return (
@@ -102,7 +128,6 @@ export default function App() {
       {/* Main App Container */}
       <div style={{ maxWidth: '480px', width: '100%', padding: '20px 16px', margin: '0 auto', position: 'relative' }}>
         
-        {/* Floating Background Music Control */}
         <MusicPlayer />
 
         {/* Header Banner Section */}
@@ -123,7 +148,7 @@ export default function App() {
           )}
 
           <h1 className="font-serif" style={{ fontSize: '38px', color: '#6b2d39', margin: '12px 0 6px 0', fontWeight: '400' }}>
-            Sarah & Kabir
+            Munni & Jungkook
           </h1>
           <p style={{ fontSize: '13px', color: '#8c7a6b', fontStyle: 'italic' }}>
             November 20, 2026 • Grand Palace, Dhaka
@@ -179,7 +204,6 @@ export default function App() {
             Please let us know your plans so we may prepare.
           </p>
 
-          {/* IF LINK IS SCANNED: SHOW VIP PASS CARD DIRECTLY */}
           {isPassScanned ? (
             <div style={{
               background: 'radial-gradient(circle at center, #2b0b14 0%, #120307 100%)',
@@ -194,7 +218,6 @@ export default function App() {
               maxWidth: '380px',
               margin: '0 auto'
             }}>
-              {/* Header Monogram & Title */}
               <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '28px', color: '#f3e5ab', margin: '0 0 2px 0', fontWeight: 'normal', letterSpacing: '1px' }}>
                 Munni & Jungkook
               </h1>
@@ -202,7 +225,6 @@ export default function App() {
                 FOREVER & ALWAYS
               </p>
 
-              {/* Gold Divider */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
                 <div style={{ width: '40px', height: '1px', background: 'linear-gradient(to right, transparent, #d4af37)' }}></div>
                 <div style={{ width: '4px', height: '4px', background: '#d4af37', transform: 'rotate(45deg)' }}></div>
@@ -216,10 +238,7 @@ export default function App() {
                 VIP PASS
               </h2>
 
-              {/* Details List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left', marginBottom: '20px' }}>
-                
-                {/* Guest Name */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span style={{ fontSize: '18px', opacity: 0.8 }}>👤</span>
                   <div>
@@ -230,7 +249,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Status Banner */}
                 <div style={{ 
                   background: scannedStatus === 'declined' ? 'linear-gradient(90deg, #3f0909 0%, #4b1b1b 100%)' : 'linear-gradient(90deg, #09203f 0%, #1b3a4b 100%)', 
                   padding: '10px 14px', 
@@ -250,7 +268,6 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* Plus Ones */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '2px' }}>
                   <span style={{ fontSize: '18px', opacity: 0.8 }}>👥</span>
                   <span style={{ fontSize: '14px', color: '#f0e6d2' }}>
@@ -258,24 +275,20 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* Meal Choice */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '2px' }}>
                   <span style={{ fontSize: '18px', opacity: 0.8 }}>🍽️</span>
                   <span style={{ fontSize: '14px', color: '#f0e6d2' }}>
                     Meal Choice: <strong>{scannedDietary || dietary}</strong>
                   </span>
                 </div>
-
               </div>
 
-              {/* Gold Divider */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
                 <div style={{ width: '40px', height: '1px', background: 'linear-gradient(to right, transparent, #d4af37)' }}></div>
                 <div style={{ width: '4px', height: '4px', background: '#d4af37', transform: 'rotate(45deg)' }}></div>
                 <div style={{ width: '40px', height: '1px', background: 'linear-gradient(to left, transparent, #d4af37)' }}></div>
               </div>
 
-              {/* Verified Access Badge */}
               <div style={{ textAlign: 'center', margin: '16px 0' }}>
                 <p style={{ fontSize: '9px', letterSpacing: '2px', color: '#c5a059', textTransform: 'uppercase', marginBottom: '8px' }}>
                   VERIFIED ACCESS CODE
@@ -297,7 +310,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{
                   background: 'linear-gradient(180deg, #581825 0%, #310a12 100%)',
@@ -345,7 +357,6 @@ export default function App() {
               </div>
             </div>
           ) : isSubmitted ? (
-            /* IF SUBMITTED: SHOW QR SCANNER ONLY */
             <div style={{ textAlign: 'center', padding: '10px 0' }}>
               <div style={{
                 background: '#faf8f5',
@@ -376,7 +387,6 @@ export default function App() {
               </div>
             </div>
           ) : (
-            /* RSVP FORM BEFORE SUBMISSION */
             <form onSubmit={handleRsvpSubmit}>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#8c7a6b', fontWeight: '600' }}>Full Name</label>
@@ -421,13 +431,11 @@ export default function App() {
           )}
         </div>
 
-        {/* Embedded Google Maps & Venue Info Section */}
         <VenueGuide />
 
-        {/* Photo Gallery Section */}
         <PhotoGallery />
 
-        {/* Guestbook Section */}
+        {/* Guestbook Section connected to Supabase */}
         <div className="card">
           <h2 className="font-serif" style={{ fontSize: '24px', color: '#6b2d39', textAlign: 'center', margin: '0 0 16px 0' }}>
             Warm Wishes
@@ -443,7 +451,7 @@ export default function App() {
 
           <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
             {wishes.map((w, idx) => (
-              <div key={idx} style={{ borderBottom: '1px solid #f0e8df', padding: '10px 0' }}>
+              <div key={w.id || idx} style={{ borderBottom: '1px solid #f0e8df', padding: '10px 0' }}>
                 <p style={{ margin: 0, fontWeight: '600', fontSize: '13px', color: '#6b2d39' }}>{w.guest_name}</p>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#8c7a6b' }}>{w.message}</p>
               </div>
@@ -451,7 +459,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Render Organizer Dashboard when ?admin=true is present in the URL */}
         {isAdminView && <AdminDashboard />}
 
       </div>
