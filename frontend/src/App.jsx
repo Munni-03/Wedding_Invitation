@@ -148,7 +148,7 @@ export default function App() {
           )}
 
           <h1 className="font-serif" style={{ fontSize: '38px', color: '#6b2d39', margin: '12px 0 6px 0', fontWeight: '400' }}>
-            Munni & Jungkook
+            Sarah & Kabir
           </h1>
           <p style={{ fontSize: '13px', color: '#8c7a6b', fontStyle: 'italic' }}>
             November 20, 2026 • Grand Palace, Dhaka
